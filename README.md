@@ -18,8 +18,9 @@ Példa: https://github.com/BBpezsgo/Feladatozas/blob/main/Example2.cs
 
 ## 3. Feladat
 > B terv
+
 Ezt remélem nem kell megcsinálni
 
-**SOK SIKERT**
+# SOK SIKERT
 
-Ha help kéne akkor tudod hogy nézek ki megtalálsz.
+Ha help kéne akkor tudod hogy nézek ki, megtalálsz.

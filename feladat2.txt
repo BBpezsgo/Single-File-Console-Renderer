@@ -17,5 +17,10 @@ TIPS:
     $"bruh változó értéke: {bruh}" --> "bruh változó értéke: 69"
     https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/tokens/interpolated
     
+EXTRA:
+  - Ha van idõd, implementálhatod a `System.IEquatable<T>` interfészt is.
+    Ez azért lehet hasznos, mert ezzel megnézheted, hogy két alakzat egyforma-e.
+    https://learn.microsoft.com/en-us/dotnet/api/system.iequatable-1?view=net-5.0
+
 EXAMPLE:
  Egy egyszerû példa az Example2.cs fájlban van
