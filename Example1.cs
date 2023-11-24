@@ -22,41 +22,25 @@ namespace Feladatozas
             public double CreatedAt; // Mikor lett kilőve
         }
 
-        static void Main(string[] args)
+        // Maga a játék class
+        class TheBruhGame
         {
-            // Csinálok egy új player-t
+            // A játékos
             Player player = new();
-
+            
+            // A lövedékek
             List<Projectile> projectiles = new();
 
             // Eltárolom az időt, ez később kelleni fog a
             // "delta time" kiszámolásához
             double lastTime = DateTime.UtcNow.TimeOfDay.TotalSeconds;
 
-            void Update(Drawer drawer)
+            public void Update(Drawer drawer)
             {
-                // Ezzel a 3 sorral számolom ki a "delta time"-t, vagyis
-
-                // Lementem a mostani időt
-                double now = DateTime.UtcNow.TimeOfDay.TotalSeconds;
-                // Kivonom a mostani időből az előző időt, megkapom a "delta time"-t
-                float delta = (float)(now - lastTime);
-                // Elmentem a mostani időt, hogy legközelebb azzal számolhassunk
-                // (a következő frissítésben a mostani idő már úgymond az előző
-                // idő, azért kell lementeni. Meg tudnunk kell az előző időt, hogy
-                // a különbséget kiszámolhassuk)
-                lastTime = now;
-
-                /*
-                 * A "delta time" az az idő (másodpercekben) amennyi eltelt az előző
-                 * frissítés óta.
-                 * Vagyis az az idő intervallum ami az `Update` két meghívása között van.
-                 */
-
                 // Rajzolok egy "P"-t, ahol a játékos van
                 drawer[player.Position] = 'P';
 
-                // Végigmegyek a összes lövedéken ami létezik
+                // Végig megyek a összes lövedéken ami létezik
                 // (visszafelé kell, mert lehet hogy ki kell majd szednünk pár
                 // elemet a listából)
                 for (int i = projectiles.Count - 1; i >= 0; i--)
@@ -67,19 +51,16 @@ namespace Feladatozas
                     drawer[projectile.Position] = 'o';
                     // Elmozgatom a lövedéket. Emlékszel a távolság képletre?
                     // távolság = sebesség * idő
-                    projectile.Position += projectile.Velocity * delta;
+                    projectile.Position += projectile.Velocity * Engine.DeltaTime;
 
                     // Ha több ideig létezik mint 5 másodperc, kiveszem a listából
                     // (és ezzel megszűnik létezni)
-                    if (now - projectile.CreatedAt > 5f)
+                    if (Engine.Now - projectile.CreatedAt > 5f)
                     { projectiles.RemoveAt(i); }
                 }
 
-                // Rajzolok egy szöveget.
-                // A "delta time" reciproka az FPS,
-                // tehát ha 1-et elosztod "delta time"-al, megkapod az 
-                // FPS-t. És azt írom ki bal fentre.
-                drawer.DrawText(0, 0, ((int)(1.0 / delta)).ToString());
+                // Kirajzolom az FPS-t bal fentre (átalakítom int-re, hogy ne legyen tört szám az FPS)
+                drawer.DrawText(0, 0, ((int)Engine.FPS).ToString());
 
                 // Ha a W billentyű le van nyomva ...
                 if (Keyboard.IsKeyPressed('w'))
@@ -100,10 +81,10 @@ namespace Feladatozas
                 // Ha a bal egérgomb le van nyomva, és
                 // a játékos még nem lőtt az előző 1 másodpercben
                 if (Mouse.IsLeftDown &&
-                    (now - player.ShotAt) >= 1f)
+                    (Engine.Now - player.ShotAt) >= 1f)
                 {
                     // Frissítem, hogy mikor lőtt utoljára
-                    player.ShotAt = now;
+                    player.ShotAt = Engine.Now;
 
                     // Kiszámolom az irányt
                     Vector2 direction = Mouse.Position - player.Position;
@@ -113,7 +94,7 @@ namespace Feladatozas
                     // Csinálok egy új lövedéket
                     Projectile newProjectile = new()
                     {
-                        CreatedAt = now, // Beállítom hogy mikor lett megcsinálva
+                        CreatedAt = Engine.Now, // Beállítom hogy mikor lett megcsinálva
                         Position = player.Position, // A helye az a játékos helye (mert onnan lövődik ki)
                         Velocity = direction * 20f, // A sebessége pedig az irány szorozva 20-al
                                                     // (20 egységet fog megtenni 1 másodperc alatt)
@@ -122,9 +103,17 @@ namespace Feladatozas
                     projectiles.Add(newProjectile);
                 }
             }
+        }
+
+        static void Main(string[] args)
+        {
+            // Egy új class a játéknak
+            TheBruhGame game = new();
 
             // Elindítom a játékot
-            Engine.DoTheStuff(Update);
+            Engine.DoTheStuff(game.Update); // Figyeld meg hogy nem hívom meg a `Update` függvényt,
+                                            // csak egy úgynevezett "function pointer"-t használok.
+                                            // Majd az "Engine" cucc meghívja ezt a függvényt.
 
             // Itt már semmi se fut le
         }

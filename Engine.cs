@@ -191,7 +191,7 @@ namespace Game
               ref SmallRect lpWriteRegion);
 
             [DllImport("user32.dll")]
-            public static extern short GetKeyState(int nVirtKey);
+            public static extern short GetKeyState(int nVirtualKey);
         }
     }
 
@@ -318,6 +318,24 @@ namespace Game
         Win32.CharInfo[] Buffer;
         Win32.SmallRect Rect;
 
+        static double lastTime;
+        static float deltaTime;
+
+        /// <summary>
+        /// Az eltelt idő az előző frissítés óta másodpercekben mérve
+        /// </summary>
+        public static float DeltaTime => deltaTime;
+
+        /// <summary>
+        /// A mostani idő másodpercekben mérve
+        /// </summary>
+        public static float Now => (float)lastTime;
+
+        /// <summary>
+        /// Frame per seconds
+        /// </summary>
+        public static float FPS => 1f / deltaTime;
+
         static short Width => (short)Console.WindowWidth;
         static short Height => (short)Console.WindowHeight;
 
@@ -333,8 +351,15 @@ namespace Game
                 Right = Width,
                 Bottom = Height,
             };
+            lastTime = DateTime.UtcNow.TimeOfDay.TotalSeconds;
         }
 
+        /// <summary>
+        /// Ezt hívd meg hogy elindítsd a játékod
+        /// </summary>
+        /// <param name="callback">
+        /// Ide egy függvényt adj meg, amit majd ez automatikusan lefuttat
+        /// </param>
         public static void DoTheStuff(Action<Drawer> callback) => new Engine(callback).OnStart();
 
         void OnStart()
@@ -351,6 +376,10 @@ namespace Game
 
             while (!Handle.IsInvalid)
             {
+                double now = DateTime.UtcNow.TimeOfDay.TotalSeconds;
+                deltaTime = (float)(now - lastTime);
+                lastTime = now;
+
                 if (Rect.Right != Width || Rect.Bottom != Height)
                 {
                     Buffer = new Win32.CharInfo[Width * Height];

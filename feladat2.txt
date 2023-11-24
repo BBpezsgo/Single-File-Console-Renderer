@@ -16,3 +16,6 @@ TIPS:
   - Tudsz használni "interpolated string"-et is, pl
     $"bruh változó értéke: {bruh}" --> "bruh változó értéke: 69"
     https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/tokens/interpolated
+    
+EXAMPLE:
+ Egy egyszerû példa az Example2.cs fájlban van

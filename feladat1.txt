@@ -9,18 +9,7 @@ Hogyan kezdj neki:
  Írtam pár segítõ class-t, hogy a renderering-et és a input-ot ne neked kelljen kezelni.
  Ez a "Game" namespace-ban van.
  A `Main` function-odban hívd meg a `Game.Engine.DoTheStuff` function-t,
- egy function pointer-el, valahogy így:
-
-
-void Update(Game.Drawer drawer)
-{
-	// Ez folyton lefut (egy while(true) loop-ban), addig amíg be nem zárod a konzolt
-}
-
-// Ebben valahol egy while(true) fog lefutni, tehát ami ez után van kód,
-// sose fog lefutni
-Game.Engine.DoTheStuff(Update);
-
+ egy function pointer-el.
 
 NOTE: 
  - Próbálj ne ismétlõdõ kódot írni (használj interfészt, pls IDamageable egy Damage method-al, 
@@ -31,3 +20,6 @@ TIPS:
    használhatod a `System.Numerics.Vector2` struct-ot,
    ez tartalmaz static function-okat is (pl `Vector2.Distance`, `Vector2.Normalize`),
    illetve mûveleteket is végezhetsz rajtuk (pl szorzás, összeadás)
+   
+EXAMPLE:
+ Egy egyszerû (ellenségek nélkül) játék az Example1.cs fájlban van
