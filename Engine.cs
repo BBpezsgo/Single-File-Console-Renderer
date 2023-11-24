@@ -310,6 +310,11 @@ namespace Game
         }
     }
 
+    public interface IGame
+    {
+        public void Update(Drawer drawer);
+    }
+
     public class Engine
     {
         readonly Action<Drawer> UpdateCallback;
@@ -361,6 +366,14 @@ namespace Game
         /// Ide egy függvényt adj meg, amit majd ez automatikusan lefuttat
         /// </param>
         public static void DoTheStuff(Action<Drawer> callback) => new Engine(callback).OnStart();
+       
+        /// <summary>
+        /// Ezt hívd meg hogy elindítsd a játékod
+        /// </summary>
+        /// <param name="callback">
+        /// Ide egy függvényt adj meg, amit majd ez automatikusan lefuttat
+        /// </param>
+        public static void DoTheStuff(IGame game) => new Engine(game.Update).OnStart();
 
         void OnStart()
         {
