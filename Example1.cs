@@ -23,7 +23,7 @@ namespace Feladatozas
         }
 
         // Maga a játék class
-        class TheBruhGame
+        class TheBruhGame : Game.IGame
         {
             // A játékos
             Player player = new();
