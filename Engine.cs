@@ -370,8 +370,8 @@ namespace Game
         /// <summary>
         /// Ezt hívd meg hogy elindítsd a játékod
         /// </summary>
-        /// <param name="callback">
-        /// Ide egy függvényt adj meg, amit majd ez automatikusan lefuttat
+        /// <param name="game">
+        /// Ide a játékod példányát adj meg, amit majd ez automatikusan lefuttat
         /// </param>
         public static void DoTheStuff(IGame game) => new Engine(game.Update).OnStart();
 
