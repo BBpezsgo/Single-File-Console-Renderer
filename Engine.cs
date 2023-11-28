@@ -545,6 +545,10 @@ namespace Game
             Win32.ConsoleListener.Stop();
         }
 
+        /// <summary>
+        /// Kilép a while loop-ból ami lefuttatja a te "Update" function-odat. Vagyis kilép a játékból.
+        /// Lehet hogy nem működik, nincs kedvem kijavítani a hibát.
+        /// </summary>
         public static void Exit() => ShouldExit = true;
     }
 }
