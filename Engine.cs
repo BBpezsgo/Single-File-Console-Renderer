@@ -341,8 +341,8 @@ namespace Game
         /// </summary>
         public static float FPS => 1f / deltaTime;
 
-        static short Width => (short)Console.WindowWidth;
-        static short Height => (short)Console.WindowHeight;
+        public static short Width => (short)Console.WindowWidth;
+        public static short Height => (short)Console.WindowHeight;
 
         Engine(Action<Drawer> updateCallback)
         {
