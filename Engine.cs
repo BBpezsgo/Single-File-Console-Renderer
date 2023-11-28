@@ -332,6 +332,8 @@ namespace Game
                 this[x + i, y] = new Win32.CharInfo(text[i], foregroundColor, backgroundColor);
             }
         }
+
+        internal void Clear() => Array.Clear(buffer, 0, buffer.Length);
     }
 
     public class Mouse
@@ -370,6 +372,11 @@ namespace Game
     /// </summary>
     public class Engine
     {
+        /// <summary>
+        /// Ki kéne lépni a játékból?
+        /// </summary>
+        static bool ShouldExit;
+
         /// <summary>
         /// Ez a te "Update" function-od, amit majd ez automatikusan meghív
         /// </summary>
@@ -443,7 +450,7 @@ namespace Game
             // Úgy néz ki mint ha egy fájlal csinálnánk valamit. Ez igazából igaz, de a fájl
             // az a standard output.
             Handle = Win32.Kernel32.CreateFile("CONOUT$", 0x40000000, 2, IntPtr.Zero, FileMode.Open, 0, IntPtr.Zero);
-            
+
             Rect = new Win32.SmallRect()
             {
                 Left = 0,
@@ -462,7 +469,7 @@ namespace Game
         /// Ide egy függvényt adj meg, amit majd ez automatikusan lefuttat
         /// </param>
         public static void DoTheStuff(Action<Drawer> callback) => new Engine(callback).OnStart();
-       
+
         /// <summary>
         /// Ezt hívd meg hogy elindítsd a játékod
         /// </summary>
@@ -525,6 +532,9 @@ namespace Game
                         new Win32.Coord() { X = Width, Y = Height },
                         new Win32.Coord() { X = 0, Y = 0 },
                         ref Rect);
+
+                if (ShouldExit)
+                { break; }
             }
 
             // Ide akkor jövünk ha bezártuk a konzolt
@@ -534,5 +544,7 @@ namespace Game
             // Leállítjuk a "ConsoleListener"-t
             Win32.ConsoleListener.Stop();
         }
+
+        public static void Exit() => ShouldExit = true;
     }
 }
