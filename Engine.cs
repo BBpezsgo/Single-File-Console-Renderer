@@ -359,6 +359,11 @@ namespace Game
     public interface IGame
     {
         /// <summary>
+        /// Ez egyszer fog lefutni az első "Update" előtt
+        /// </summary>
+        public void Initialize();
+
+        /// <summary>
         /// Ez automatikusan meg lesz hívva egy while loop-ban
         /// </summary>
         /// <param name="drawer">
@@ -372,15 +377,21 @@ namespace Game
     /// </summary>
     public class Engine
     {
+        static Engine Instance;
+
         /// <summary>
         /// Ki kéne lépni a játékból?
         /// </summary>
-        static bool ShouldExit;
+        bool ShouldExit;
 
         /// <summary>
-        /// Ez a te "Update" function-od, amit majd ez automatikusan meghív
+        /// A játékod példánya
+        /// <br/>
+        /// Az <see cref="Engine"/>-t nem érdekli hogy működik, a lényeg, hogy legyen benne
+        /// egy Update és egy Initialize function
         /// </summary>
-        readonly Action<Drawer> UpdateCallback;
+        readonly IGame Game;
+
         /// <summary>
         /// Standard output handle
         /// <br/>
@@ -410,26 +421,26 @@ namespace Game
         /// <summary>
         /// Az előző game frame ideje (kell a delta time számításához)
         /// </summary>
-        static double lastTime;
+        double lastTime;
         /// <summary>
         /// Az eltárolt delta time, hogy ne kelljen folyton kiszámítani amikor kell nekünk.
         /// </summary>
-        static float deltaTime;
+        float deltaTime;
 
         /// <summary>
         /// Az eltelt idő az előző frissítés óta másodpercekben mérve
         /// </summary>
-        public static float DeltaTime => deltaTime;
+        public static float DeltaTime => Instance.deltaTime;
 
         /// <summary>
         /// A mostani idő másodpercekben mérve
         /// </summary>
-        public static float Now => (float)lastTime;
+        public static float Now => (float)Instance.lastTime;
 
         /// <summary>
         /// Frame per seconds
         /// </summary>
-        public static float FPS => 1f / deltaTime;
+        public static float FPS => 1f / Instance.deltaTime;
 
         /// <summary>
         /// A konzol szélessége karakterekben mérve (oszlopok száma)
@@ -440,9 +451,11 @@ namespace Game
         /// </summary>
         public static short Height => (short)Console.WindowHeight;
 
-        Engine(Action<Drawer> updateCallback)
+        Engine(IGame game)
         {
-            UpdateCallback = updateCallback;
+            Instance = this;
+
+            Game = game;
 
             Buffer = new Win32.CharInfo[Width * Height];
 
@@ -465,18 +478,10 @@ namespace Game
         /// <summary>
         /// Ezt hívd meg hogy elindítsd a játékod
         /// </summary>
-        /// <param name="callback">
-        /// Ide egy függvényt adj meg, amit majd ez automatikusan lefuttat
-        /// </param>
-        public static void DoTheStuff(Action<Drawer> callback) => new Engine(callback).OnStart();
-
-        /// <summary>
-        /// Ezt hívd meg hogy elindítsd a játékod
-        /// </summary>
         /// <param name="game">
         /// Ide a játékod példányát adj meg, amit majd ez automatikusan lefuttat
         /// </param>
-        public static void DoTheStuff(IGame game) => new Engine(game.Update).OnStart();
+        public static void DoTheStuff(IGame game) => new Engine(game).OnStart();
 
         void OnStart()
         {
@@ -498,6 +503,9 @@ namespace Game
             // Hallgatunk egy egér event-re
             // Ha valami történik az egérrel, a "Mouse.HandleMouseEvent" fog lefutni
             Win32.ConsoleListener.MouseEvent += Mouse.HandleMouseEvent;
+
+            // Meghívjuk a te function-odat, ami initializálja a játékod
+            Game.Initialize();
 
             // Addig amíg a stdin handle érvényes (ha a konzolt bezárjuk akkor érvénytelen lesz) ...
             while (!Handle.IsInvalid)
@@ -525,7 +533,7 @@ namespace Game
                 // Most itt a buffer mérete rendben van, és üres karakterekkel van feltöltve
 
                 // Meghívjuk a te function-odat, ami kezeli majd a játék dolgokat
-                UpdateCallback.Invoke(new Drawer(Buffer, Width, Height));
+                Game.Update(new Drawer(Buffer, Width, Height));
 
                 // Meghívunk egy Win32 API-t, ami a buffert tényleg átmásolja a konzole-ba
                 _ = Win32.Kernel32.WriteConsoleOutputW(Handle, Buffer,
@@ -549,6 +557,6 @@ namespace Game
         /// Kilép a while loop-ból ami lefuttatja a te "Update" function-odat. Vagyis kilép a játékból.
         /// Lehet hogy nem működik, nincs kedvem kijavítani a hibát.
         /// </summary>
-        public static void Exit() => ShouldExit = true;
+        public static void Exit() => Instance.ShouldExit = true;
     }
 }
