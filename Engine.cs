@@ -4,6 +4,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 
+#pragma warning disable SYSLIB1054 // Use 'LibraryImportAttribute' instead of 'DllImportAttribute' to generate P/Invoke marshalling code at compile time
 #pragma warning disable CA1401 // P/Invokes should not be visible
 
 namespace Game
@@ -32,7 +33,7 @@ namespace Game
                     // Egy thread külön fut a kód többi részeitől. Saját stack-ja van neki, de a HEAP az közös.
                     new System.Threading.Thread(() =>
                     {
-                        while (true)
+                        while (Run)
                         {
                             // Win32 API, olvasunk egy event-et az stdin-ről (3 sor)
                             uint numRead = 0;
@@ -263,7 +264,7 @@ namespace Game
         }
 
         /// <summary>
-        /// Átkonvertálja a karaktert egy virtális billentyű azonosítóvá
+        /// Átkonvertálja a karaktert egy virtuális billentyű azonosítóvá
         /// <br/>
         /// <see href="https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes"/>
         /// </summary>
@@ -328,9 +329,7 @@ namespace Game
         public void DrawText(int x, int y, string text, Color foregroundColor = Color.Silver, Color backgroundColor = Color.Black)
         {
             for (int i = 0; i < text.Length; i++)
-            {
-                this[x + i, y] = new Win32.CharInfo(text[i], foregroundColor, backgroundColor);
-            }
+            { this[x + i, y] = new Win32.CharInfo(text[i], foregroundColor, backgroundColor); }
         }
 
         internal void Clear() => Array.Clear(buffer, 0, buffer.Length);
@@ -535,7 +534,7 @@ namespace Game
                 // Meghívjuk a te function-odat, ami kezeli majd a játék dolgokat
                 Game.Update(new Drawer(Buffer, Width, Height));
 
-                // Meghívunk egy Win32 API-t, ami a buffert tényleg átmásolja a konzole-ba
+                // Meghívunk egy Win32 API-t, ami a buffert tényleg átmásolja a konzolba
                 _ = Win32.Kernel32.WriteConsoleOutputW(Handle, Buffer,
                         new Win32.Coord() { X = Width, Y = Height },
                         new Win32.Coord() { X = 0, Y = 0 },
