@@ -1,5 +1,8 @@
 # Programozás feladatok megoldása interfészekkel és inheritálással
 
+![C# 7.0](https://img.shields.io/badge/c%23-7.0-%23239120.svg)
+![.NET 5.0](https://img.shields.io/badge/.NET-5.0-5C2D91)
+
 ## 1. Feladat
 > A terv
 Ebben a feladatban egy 2D-s játékot kell csinálnod.

@@ -1,115 +1,13 @@
-﻿#if !IS_LINUX
+﻿#if IS_LINUX
 using System;
-using System.Diagnostics;
 using System.Numerics;
-using System.IO;
 using System.Runtime.InteropServices;
-using Microsoft.Win32.SafeHandles;
-
-#pragma warning disable SYSLIB1054 // Use 'LibraryImportAttribute' instead of 'DllImportAttribute' to generate P/Invoke marshalling code at compile time
-#pragma warning disable CA1401 // P/Invokes should not be visible
+using System.Threading;
 
 namespace Game
 {
     namespace Win32
     {
-        public static class ConsoleListener
-        {
-            public static event ConsoleMouseEvent MouseEvent;
-            public static event ConsoleKeyEvent KeyEvent;
-
-            static bool Run = false;
-
-            public static void Start()
-            {
-                // Ha még nincs elindítva (azért ellenőrizzük, hogy ha pl 2x hívjuk meg ezt
-                // a function-t akkor ne rontsunk el semmit)
-                if (!Run)
-                {
-                    Run = true;
-
-                    // Win32 API, lekérjük az stdin handle-jét
-                    var handleIn = Kernel32.GetStdHandle(Kernel32.STD_INPUT_HANDLE);
-
-                    // Egy új thread-ot csinálunk
-                    // Egy thread külön fut a kód többi részeitől. Saját stack-ja van neki, de a HEAP az közös.
-                    new System.Threading.Thread(() =>
-                    {
-                        while (Run)
-                        {
-                            // Win32 API, olvasunk egy event-et az stdin-ről (3 sor)
-                            uint numRead = 0;
-                            INPUT_RECORD record = new INPUT_RECORD();
-                            Kernel32.ReadConsoleInput(handleIn, ref record, 1, ref numRead);
-
-                            // Ha nem kéne még leállni, akkor yah
-                            if (Run)
-                            {
-                                switch (record.EventType)
-                                {
-                                    case Kernel32.MOUSE_EVENT: // Ha az egérrel történt valami
-                                        // Meghívjuk az összes function-t ami ezt hallgatja
-                                        MouseEvent?.Invoke(record.MouseEvent);
-                                        break;
-                                    case Kernel32.KEY_EVENT: // Ha a billentyűzettel történt valami
-                                        // Meghívjuk az összes function-t ami ezt hallgatja
-                                        KeyEvent?.Invoke(record.KeyEvent);
-                                        break;
-                                }
-                            }
-                        }
-                    }).Start();
-                }
-            }
-
-            public static void Stop() => Run = false;
-
-
-            public delegate void ConsoleMouseEvent(MOUSE_EVENT_RECORD r);
-            public delegate void ConsoleKeyEvent(KEY_EVENT_RECORD r);
-        }
-
-        [DebuggerDisplay("EventType: {EventType}")]
-        [StructLayout(LayoutKind.Explicit)]
-        public struct INPUT_RECORD
-        {
-            [FieldOffset(0)]
-            public Int16 EventType;
-            [FieldOffset(4)]
-            public KEY_EVENT_RECORD KeyEvent;
-            [FieldOffset(4)]
-            public MOUSE_EVENT_RECORD MouseEvent;
-        }
-
-        [DebuggerDisplay("{dwMousePosition.X}, {dwMousePosition.Y}")]
-        public struct MOUSE_EVENT_RECORD
-        {
-            public Coord dwMousePosition;
-            public Int32 dwButtonState;
-            public Int32 dwControlKeyState;
-            public Int32 dwEventFlags;
-        }
-
-        [StructLayout(LayoutKind.Explicit)]
-        public struct KEY_EVENT_RECORD
-        {
-            [FieldOffset(0)]
-            [MarshalAsAttribute(UnmanagedType.Bool)]
-            public Boolean bKeyDown;
-            [FieldOffset(4)]
-            public UInt16 wRepeatCount;
-            [FieldOffset(6)]
-            public UInt16 wVirtualKeyCode;
-            [FieldOffset(8)]
-            public UInt16 wVirtualScanCode;
-            [FieldOffset(10)]
-            public Char UnicodeChar;
-            [FieldOffset(10)]
-            public Byte AsciiChar;
-            [FieldOffset(12)]
-            public Int32 dwControlKeyState;
-        };
-
         [StructLayout(LayoutKind.Sequential)]
         public struct Coord
         {
@@ -156,60 +54,6 @@ namespace Game
             public short Right;
             public short Bottom;
         }
-
-        public class ConsoleHandle : SafeHandleMinusOneIsInvalid
-        {
-            public ConsoleHandle() : base(false) { }
-            protected override bool ReleaseHandle() => true;
-        }
-
-        public static class Kernel32
-        {
-            public const int STD_INPUT_HANDLE = -10;
-
-            public const uint ENABLE_MOUSE_INPUT = 0x0010;
-            public const uint ENABLE_QUICK_EDIT_MODE = 0x0040;
-            public const uint ENABLE_EXTENDED_FLAGS = 0x0080;
-
-            public const short KEY_EVENT = 1;
-            public const short MOUSE_EVENT = 2;
-
-            [DllImport("kernel32.dll", SetLastError = true)]
-            [return: MarshalAs(UnmanagedType.Bool)]
-            public static extern bool GetConsoleMode(ConsoleHandle hConsoleHandle, ref uint lpMode);
-
-            [DllImport("kernel32.dll", SetLastError = true)]
-            public static extern ConsoleHandle GetStdHandle(int nStdHandle);
-
-            [DllImport("kernel32.dll", SetLastError = true)]
-            [return: MarshalAs(UnmanagedType.Bool)]
-            public static extern bool ReadConsoleInput(ConsoleHandle hConsoleInput, ref INPUT_RECORD lpBuffer, uint nLength, ref uint lpNumberOfEventsRead);
-
-            [DllImport("kernel32.dll", SetLastError = true)]
-            [return: MarshalAs(UnmanagedType.Bool)]
-            public static extern bool SetConsoleMode(ConsoleHandle hConsoleHandle, uint dwMode);
-
-            [DllImport("Kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-            public static extern SafeFileHandle CreateFile(
-                string fileName,
-                [MarshalAs(UnmanagedType.U4)] uint fileAccess,
-                [MarshalAs(UnmanagedType.U4)] uint fileShare,
-                IntPtr securityAttributes,
-                [MarshalAs(UnmanagedType.U4)] FileMode creationDisposition,
-                [MarshalAs(UnmanagedType.U4)] int flags,
-                IntPtr template);
-
-            [DllImport("kernel32.dll", SetLastError = true)]
-            public static extern bool WriteConsoleOutputW(
-              SafeFileHandle hConsoleOutput,
-              CharInfo[] lpBuffer,
-              Coord dwBufferSize,
-              Coord dwBufferCoord,
-              ref SmallRect lpWriteRegion);
-
-            [DllImport("user32.dll")]
-            public static extern short GetKeyState(int nVirtualKey);
-        }
     }
 
     /// <summary>
@@ -250,29 +94,25 @@ namespace Game
 
     public static class Keyboard
     {
+        static readonly bool[] Buffer = new bool[byte.MaxValue];
+
         /// <exception cref="NotImplementedException"/>
         public static bool IsKeyPressed(char key)
-            => IsKeyPressed(KeyToVirtual(key));
+        {
+            key = char.ToUpperInvariant(key);
+            if (key < byte.MinValue || key >= byte.MaxValue) return false;
+            return Buffer[key];
+        }
 
         /// <exception cref="NotImplementedException"/>
         public static bool IsKeyPressed(int virtualScanCode)
         {
-            // Ez is egy Win32 API, lekéri a billentyű helyzetét
-            short state = Win32.Kernel32.GetKeyState(virtualScanCode);
-            switch (state)
-            {
-                case 0:
-                case 1:
-                    return false;
-                default:
-                    return true;
-            }
+            if (virtualScanCode < byte.MinValue || virtualScanCode >= byte.MaxValue) return false;
+            return Buffer[virtualScanCode];
         }
 
         /// <summary>
         /// Átkonvertálja a karaktert egy virtuális billentyű azonosítóvá
-        /// <br/>
-        /// <see href="https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes"/>
         /// </summary>
         /// <exception cref="NotImplementedException"/>
         static int KeyToVirtual(char key)
@@ -282,10 +122,29 @@ namespace Game
             if (key >= 'A' && key <= 'Z') return key;
             switch (key)
             {
-                case '\r':return 0x0D;
-                case ' ':return 0x20;
+                case '\r': return 0x0D;
+                case ' ': return 0x20;
                 default: throw new NotImplementedException($":(");
             }
+        }
+
+        public static void Reset() => Array.Clear(Buffer, 0, Buffer.Length);
+
+        public static void Feed(ConsoleKeyInfo c)
+        {
+            char keyChar = char.ToUpperInvariant(c.KeyChar);
+            if (keyChar < byte.MinValue || keyChar > byte.MaxValue - 1) return;
+
+            if (keyChar != 0)
+            {
+                Buffer[keyChar] = true;
+                return;
+            }
+
+            int key = (int)c.Key;
+            if (key < byte.MinValue || key > byte.MaxValue - 1) return;
+
+            Buffer[key] = true;
         }
     }
 
@@ -310,6 +169,12 @@ namespace Game
                 if (x < 0 || y < 0) return;
                 if (x >= Width || y >= Height) return;
                 buffer[x + (y * Width)] = value;
+#if false
+                Console.Out.Write($"\x1b[{y + 1};{x + 1}H");
+                Console.Out.Write($"\x1b[38;5;{value.Attributes & 0b_1111}m");
+                Console.Out.Write($"\x1b[48;5;{(value.Attributes >> 4) & 0b_1111}m");
+                Console.Out.Write(value.Char);
+#endif
             }
         }
 
@@ -338,7 +203,11 @@ namespace Game
             { this[x + i, y] = new Win32.CharInfo(text[i], foregroundColor, backgroundColor); }
         }
 
-        internal void Clear() => Array.Clear(buffer, 0, buffer.Length);
+        internal void Clear()
+        {
+            Console.Clear();
+            Array.Clear(buffer, 0, buffer.Length);
+        }
     }
 
     public class Mouse
@@ -346,6 +215,7 @@ namespace Game
         public static Vector2 Position { get; private set; }
         public static bool IsLeftDown { get; private set; }
 
+#if WIN32
         // Ez lefut ha az egérrel történik valami
         public static void HandleMouseEvent(Win32.MOUSE_EVENT_RECORD e)
         {
@@ -354,8 +224,9 @@ namespace Game
             // A "dwButtonState" minden bit-je egy igaz-hamis érték.
             // Ezzel akár 32 igaz-hamis értéket is eltárolhatunk egy int-ben.
             // Tehát ennek a legutolsó bit-jét szedjük ki, ami a bal klikk helyzete (1 = lenyomva, 0 = nem lenyomva)
-            IsLeftDown = (e.dwButtonState & 1) != 0;
+            IsLeftDown = (e.dwButtonState & 0b_1) != 0;
         }
+#endif
     }
 
     /// <summary>
@@ -396,17 +267,6 @@ namespace Game
         /// egy Update és egy Initialize function
         /// </summary>
         readonly IGame Game;
-
-        /// <summary>
-        /// Standard output handle
-        /// <br/>
-        /// A standard output az egy úgymond adat stream,
-        /// amit szöveges kimenetként szoktunk használni.
-        /// Pl a Console.WriteLine ebbe a stream-ba ír.
-        /// <br/>
-        /// A handle egy windows cucc, kissé hosszú lenne elmagyarázni.
-        /// </summary>
-        readonly SafeFileHandle Handle;
 
         /// <summary>
         /// A konzol buffer
@@ -464,11 +324,6 @@ namespace Game
 
             Buffer = new Win32.CharInfo[Width * Height];
 
-            // Lekérjük a standard output handle-jét.
-            // Úgy néz ki mint ha egy fájlal csinálnánk valamit. Ez igazából igaz, de a fájl
-            // az a standard output.
-            Handle = Win32.Kernel32.CreateFile("CONOUT$", 0x40000000, 2, IntPtr.Zero, FileMode.Open, 0, IntPtr.Zero);
-
             Rect = new Win32.SmallRect()
             {
                 Left = 0,
@@ -490,30 +345,25 @@ namespace Game
 
         void OnStart()
         {
-            // Lekérjük a standard input handle-jét, mert
-            // be kell állítani pár dolgot rajta
-            Win32.ConsoleHandle inHandle = Win32.Kernel32.GetStdHandle(Win32.Kernel32.STD_INPUT_HANDLE);
-            uint mode = 0;
-            // először lekérjük a konzol módot
-            Win32.Kernel32.GetConsoleMode(inHandle, ref mode);
-            // letiltjuk a kijelölést
-            mode &= ~Win32.Kernel32.ENABLE_QUICK_EDIT_MODE;
-            // engedélyezzük az egér bemenetet
-            mode |= Win32.Kernel32.ENABLE_MOUSE_INPUT;
-            // beállítjuk a konzol módot
-            Win32.Kernel32.SetConsoleMode(inHandle, mode);
+            Console.CursorVisible = false;
 
-            // Elindítjuk a ConsoleListener-t
-            Win32.ConsoleListener.Start();
-            // Hallgatunk egy egér event-re
-            // Ha valami történik az egérrel, a "Mouse.HandleMouseEvent" fog lefutni
-            Win32.ConsoleListener.MouseEvent += Mouse.HandleMouseEvent;
+            Thread keyboardInputThread = new Thread(() =>
+            {
+                while (true)
+                {
+                    ConsoleKeyInfo key = Console.ReadKey(true);
+                    Keyboard.Feed(key);
+                }
+            })
+            { IsBackground = true };
+            keyboardInputThread.Start();
+
+            float shouldClearKeyboard = 0f;
 
             // Meghívjuk a te function-odat, ami initializálja a játékod
             Game.Initialize();
 
-            // Addig amíg a stdin handle érvényes (ha a konzolt bezárjuk akkor érvénytelen lesz) ...
-            while (!Handle.IsInvalid)
+            while (true)
             {
                 // Kiszámítjuk a delta time-t (ez a 3 sor)
                 double now = DateTime.UtcNow.TimeOfDay.TotalSeconds;
@@ -540,11 +390,18 @@ namespace Game
                 // Meghívjuk a te function-odat, ami kezeli majd a játék dolgokat
                 Game.Update(new Drawer(Buffer, Width, Height));
 
-                // Meghívunk egy Win32 API-t, ami a buffert tényleg átmásolja a konzolba
-                _ = Win32.Kernel32.WriteConsoleOutputW(Handle, Buffer,
-                        new Win32.Coord() { X = Width, Y = Height },
-                        new Win32.Coord() { X = 0, Y = 0 },
-                        ref Rect);
+                shouldClearKeyboard += deltaTime;
+                if (shouldClearKeyboard > .1f)
+                {
+                    Keyboard.Reset();
+                    shouldClearKeyboard = 0f;
+                }
+
+                Console.SetCursorPosition(0, 0);
+                char[] bufferChars = new char[Buffer.Length];
+                for (int i = 0; i < Buffer.Length; i++)
+                { bufferChars[i] = (Buffer[i].Char == '\0') ? ' ' : Buffer[i].Char; }
+                Console.Write(bufferChars);
 
                 if (ShouldExit)
                 { break; }
@@ -552,10 +409,7 @@ namespace Game
 
             // Ide akkor jövünk ha bezártuk a konzolt
 
-            // Befejezzük a hallgatást az egérre
-            Win32.ConsoleListener.MouseEvent -= Mouse.HandleMouseEvent;
-            // Leállítjuk a "ConsoleListener"-t
-            Win32.ConsoleListener.Stop();
+            Console.CursorVisible = true;
         }
 
         /// <summary>
