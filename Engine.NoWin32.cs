@@ -8,19 +8,6 @@ namespace Game
 {
     namespace Win32
     {
-        [StructLayout(LayoutKind.Sequential)]
-        public struct Coord
-        {
-            public short X;
-            public short Y;
-
-            public Coord(short X, short Y)
-            {
-                this.X = X;
-                this.Y = Y;
-            }
-        };
-
         [StructLayout(LayoutKind.Explicit, CharSet = CharSet.Unicode)]
         public struct CharInfo
         {
@@ -105,27 +92,10 @@ namespace Game
         }
 
         /// <exception cref="NotImplementedException"/>
-        public static bool IsKeyPressed(int virtualScanCode)
+        public static bool IsKeyPressed(int key)
         {
-            if (virtualScanCode < byte.MinValue || virtualScanCode >= byte.MaxValue) return false;
-            return Buffer[virtualScanCode];
-        }
-
-        /// <summary>
-        /// Átkonvertálja a karaktert egy virtuális billentyű azonosítóvá
-        /// </summary>
-        /// <exception cref="NotImplementedException"/>
-        static int KeyToVirtual(char key)
-        {
-            key = char.ToUpperInvariant(key);
-            if (key >= '0' && key <= '9') return key;
-            if (key >= 'A' && key <= 'Z') return key;
-            switch (key)
-            {
-                case '\r': return 0x0D;
-                case ' ': return 0x20;
-                default: throw new NotImplementedException($":(");
-            }
+            if (key < byte.MinValue || key >= byte.MaxValue) return false;
+            return Buffer[key];
         }
 
         public static void Reset() => Array.Clear(Buffer, 0, Buffer.Length);
