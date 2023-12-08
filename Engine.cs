@@ -1,9 +1,9 @@
 ﻿#if !IS_LINUX
 using System;
-using System.Diagnostics;
-using System.Numerics;
 using System.IO;
+using System.Numerics;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Microsoft.Win32.SafeHandles;
 
 #pragma warning disable SYSLIB1054 // Use 'LibraryImportAttribute' instead of 'DllImportAttribute' to generate P/Invoke marshalling code at compile time
@@ -13,47 +13,41 @@ namespace Game
 {
     namespace Win32
     {
+        public delegate void ConsoleMouseEvent(MouseEvent r);
+        public delegate void ConsoleKeyEvent(KeyEvent r);
+
         public static class ConsoleListener
         {
-            public static event ConsoleMouseEvent MouseEvent;
-            public static event ConsoleKeyEvent KeyEvent;
+            public static event ConsoleMouseEvent OnMouseEvent;
+            public static event ConsoleKeyEvent OnKeyEvent;
 
-            static bool Run = false;
+            static bool IsRunning = false;
 
             public static void Start()
             {
-                // Ha még nincs elindítva (azért ellenőrizzük, hogy ha pl 2x hívjuk meg ezt
-                // a function-t akkor ne rontsunk el semmit)
-                if (!Run)
+                if (!IsRunning)
                 {
-                    Run = true;
+                    IsRunning = true;
 
-                    // Win32 API, lekérjük az stdin handle-jét
-                    var handleIn = Kernel32.GetStdHandle(Kernel32.STD_INPUT_HANDLE);
+                    ConsoleHandle inputHandle = Kernel32.GetStdHandle(Kernel32.STD_INPUT_HANDLE);
 
-                    // Egy új thread-ot csinálunk
-                    // Egy thread külön fut a kód többi részeitől. Saját stack-ja van neki, de a HEAP az közös.
-                    new System.Threading.Thread(() =>
+                    new Thread(() =>
                     {
-                        while (Run)
+                        while (IsRunning)
                         {
-                            // Win32 API, olvasunk egy event-et az stdin-ről (3 sor)
-                            uint numRead = 0;
-                            INPUT_RECORD record = new INPUT_RECORD();
-                            Kernel32.ReadConsoleInput(handleIn, ref record, 1, ref numRead);
+                            uint readedRecords = 0;
+                            InputEvent record = new InputEvent();
+                            Kernel32.ReadConsoleInput(inputHandle, ref record, 1, ref readedRecords);
 
-                            // Ha nem kéne még leállni, akkor yah
-                            if (Run)
+                            if (IsRunning)
                             {
                                 switch (record.EventType)
                                 {
-                                    case Kernel32.MOUSE_EVENT: // Ha az egérrel történt valami
-                                        // Meghívjuk az összes function-t ami ezt hallgatja
-                                        MouseEvent?.Invoke(record.MouseEvent);
+                                    case Kernel32.MOUSE_EVENT:
+                                        OnMouseEvent?.Invoke(record.MouseEvent);
                                         break;
-                                    case Kernel32.KEY_EVENT: // Ha a billentyűzettel történt valami
-                                        // Meghívjuk az összes function-t ami ezt hallgatja
-                                        KeyEvent?.Invoke(record.KeyEvent);
+                                    case Kernel32.KEY_EVENT:
+                                        OnKeyEvent?.Invoke(record.KeyEvent);
                                         break;
                                 }
                             }
@@ -62,76 +56,61 @@ namespace Game
                 }
             }
 
-            public static void Stop() => Run = false;
-
-
-            public delegate void ConsoleMouseEvent(MOUSE_EVENT_RECORD r);
-            public delegate void ConsoleKeyEvent(KEY_EVENT_RECORD r);
-        }
-
-        [DebuggerDisplay("EventType: {EventType}")]
-        [StructLayout(LayoutKind.Explicit)]
-        public struct INPUT_RECORD
-        {
-            [FieldOffset(0)]
-            public Int16 EventType;
-            [FieldOffset(4)]
-            public KEY_EVENT_RECORD KeyEvent;
-            [FieldOffset(4)]
-            public MOUSE_EVENT_RECORD MouseEvent;
-        }
-
-        [DebuggerDisplay("{dwMousePosition.X}, {dwMousePosition.Y}")]
-        public struct MOUSE_EVENT_RECORD
-        {
-            public Coord dwMousePosition;
-            public Int32 dwButtonState;
-            public Int32 dwControlKeyState;
-            public Int32 dwEventFlags;
+            public static void Stop() => IsRunning = false;
         }
 
         [StructLayout(LayoutKind.Explicit)]
-        public struct KEY_EVENT_RECORD
+        public struct InputEvent
         {
-            [FieldOffset(0)]
-            [MarshalAsAttribute(UnmanagedType.Bool)]
-            public Boolean bKeyDown;
-            [FieldOffset(4)]
-            public UInt16 wRepeatCount;
-            [FieldOffset(6)]
-            public UInt16 wVirtualKeyCode;
-            [FieldOffset(8)]
-            public UInt16 wVirtualScanCode;
-            [FieldOffset(10)]
-            public Char UnicodeChar;
-            [FieldOffset(10)]
-            public Byte AsciiChar;
-            [FieldOffset(12)]
-            public Int32 dwControlKeyState;
-        };
+            [FieldOffset(0)] public short EventType;
+            [FieldOffset(4)] public KeyEvent KeyEvent;
+            [FieldOffset(4)] public MouseEvent MouseEvent;
+        }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct Coord
+        public struct MouseEvent
+        {
+            public ConsolePoint MousePosition;
+            public int ButtonState;
+            public int ControlKeyState;
+            public int EventFlags;
+        }
+
+        [StructLayout(LayoutKind.Explicit)]
+        public struct KeyEvent
+        {
+            [MarshalAs(UnmanagedType.Bool)]
+            [FieldOffset(0)] public bool IsKeyDown;
+            [FieldOffset(4)] public ushort RepeatCount;
+            [FieldOffset(6)] public ushort VirtualKeyCode;
+            [FieldOffset(8)] public ushort VirtualScanCode;
+            [FieldOffset(10)] public char UnicodeChar;
+            [FieldOffset(10)] public byte AsciiChar;
+            [FieldOffset(12)] public int ControlKeyState;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct ConsolePoint
         {
             public short X;
             public short Y;
 
-            public Coord(short X, short Y)
+            public ConsolePoint(short X, short Y)
             {
                 this.X = X;
                 this.Y = Y;
             }
-        };
+        }
 
         [StructLayout(LayoutKind.Explicit, CharSet = CharSet.Unicode)]
-        public struct CharInfo
+        public struct ConsoleCharacter
         {
             [FieldOffset(0)] public char Char;
             [FieldOffset(2)] public ushort Attributes;
 
-            public static CharInfo Zero => new CharInfo('\0', (byte)0, (byte)0);
+            public static ConsoleCharacter Zero => new ConsoleCharacter('\0', (byte)0, (byte)0);
 
-            public CharInfo(char @char, byte foregroundColor, byte backgroundColor)
+            public ConsoleCharacter(char @char, byte foregroundColor, byte backgroundColor)
             {
                 Char = @char;
 
@@ -141,11 +120,11 @@ namespace Game
                 Attributes = (ushort)((backgroundColor << 4) | foregroundColor);
             }
 
-            public CharInfo(char @char, Color foregroundColor, Color backgroundColor) : this(@char, (byte)foregroundColor, (byte)backgroundColor)
+            public ConsoleCharacter(char @char, Color foregroundColor, Color backgroundColor) : this(@char, (byte)foregroundColor, (byte)backgroundColor)
             { }
 
-            public static implicit operator char(CharInfo v) => v.Char;
-            public static implicit operator CharInfo(char v) => new CharInfo(v, 0x7, 0x0);
+            public static implicit operator char(ConsoleCharacter v) => v.Char;
+            public static implicit operator ConsoleCharacter(char v) => new ConsoleCharacter(v, Color.Silver, Color.Black);
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -176,18 +155,26 @@ namespace Game
 
             [DllImport("kernel32.dll", SetLastError = true)]
             [return: MarshalAs(UnmanagedType.Bool)]
-            public static extern bool GetConsoleMode(ConsoleHandle hConsoleHandle, ref uint lpMode);
+            public static extern bool GetConsoleMode(
+                ConsoleHandle consoleHandle,
+                ref uint mode);
 
             [DllImport("kernel32.dll", SetLastError = true)]
-            public static extern ConsoleHandle GetStdHandle(int nStdHandle);
+            public static extern ConsoleHandle GetStdHandle(int stdHandle);
 
             [DllImport("kernel32.dll", SetLastError = true)]
             [return: MarshalAs(UnmanagedType.Bool)]
-            public static extern bool ReadConsoleInput(ConsoleHandle hConsoleInput, ref INPUT_RECORD lpBuffer, uint nLength, ref uint lpNumberOfEventsRead);
+            public static extern bool ReadConsoleInput(
+                ConsoleHandle consoleInputHandle,
+                ref InputEvent buffer,
+                uint length,
+                ref uint numberOfEventsRead);
 
             [DllImport("kernel32.dll", SetLastError = true)]
             [return: MarshalAs(UnmanagedType.Bool)]
-            public static extern bool SetConsoleMode(ConsoleHandle hConsoleHandle, uint dwMode);
+            public static extern bool SetConsoleMode(
+                ConsoleHandle consoleHandle,
+                uint mode);
 
             [DllImport("Kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
             public static extern SafeFileHandle CreateFile(
@@ -201,22 +188,22 @@ namespace Game
 
             [DllImport("kernel32.dll", SetLastError = true)]
             public static extern bool WriteConsoleOutputW(
-              SafeFileHandle hConsoleOutput,
-              CharInfo[] lpBuffer,
-              Coord dwBufferSize,
-              Coord dwBufferCoord,
-              ref SmallRect lpWriteRegion);
+              SafeFileHandle consoleOutputHandle,
+              ConsoleCharacter[] buffer,
+              ConsolePoint bufferSize,
+              ConsolePoint bufferCoord,
+              ref SmallRect writeRegion);
 
             [DllImport("user32.dll")]
-            public static extern short GetKeyState(int nVirtualKey);
+            public static extern short GetKeyState(int virtualKey);
         }
     }
 
     /// <summary>
-    /// Egy konzol szín. A konzolban nem használhatunk (vagyis de de mind1)
-    /// RGB színt, mert a Win32 API nem support-álja.
-    /// Ez is egy bitmask cucc, amit így kell értelmezni:<br/>
-    /// <c>IRGB</c>
+    /// Console color
+    /// </summary>
+    /// <remarks>
+    /// Represents console color in 4-bit format as follows: <c>IRGB</c>
     /// <br/>
     /// <c>I</c> - Intensity
     /// <br/>
@@ -225,7 +212,7 @@ namespace Game
     /// <c>G</c> - Green
     /// <br/>
     /// <c>B</c> - Blue
-    /// </summary>
+    /// </remarks>
     public enum Color : byte
     {
         Red = 0x4,
@@ -248,32 +235,43 @@ namespace Game
         White = 0xf,
     }
 
+    /// <summary>
+    /// Helper class for handling keyboard input
+    /// </summary>
     public static class Keyboard
     {
+        /// <summary>
+        /// Checks whether the key associated with <paramref name="character"/> is down or not.
+        /// </summary>
+        /// <returns>
+        /// <see langword="true"/> if the key is pressed, <see langword="false"/> otherwise.
+        /// </returns>
         /// <exception cref="NotImplementedException"/>
-        public static bool IsKeyPressed(char key)
-            => IsKeyPressed(KeyToVirtual(key));
+        public static bool IsKeyPressed(char character)
+            => IsKeyPressed(KeyToVirtual(character));
 
+        /// <summary>
+        /// Checks whether the specified key is down or not.
+        /// </summary>
+        /// <returns>
+        /// <see langword="true"/> if the key is pressed, <see langword="false"/> otherwise.
+        /// </returns>
+        /// <remarks>
+        /// For the list of key codes, see <see href="https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes"/>
+        /// </remarks>
         /// <exception cref="NotImplementedException"/>
         public static bool IsKeyPressed(int virtualScanCode)
         {
-            // Ez is egy Win32 API, lekéri a billentyű helyzetét
             short state = Win32.Kernel32.GetKeyState(virtualScanCode);
-            switch (state)
-            {
-                case 0:
-                case 1:
-                    return false;
-                default:
-                    return true;
-            }
+            return state != 0 && state != 1;
         }
 
         /// <summary>
-        /// Átkonvertálja a karaktert egy virtuális billentyű azonosítóvá
-        /// <br/>
-        /// <see href="https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes"/>
+        /// Converts the character to a virtual key identifier
         /// </summary>
+        /// <remarks>
+        /// For the list of key codes, see <see href="https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes"/>
+        /// </remarks>
         /// <exception cref="NotImplementedException"/>
         static int KeyToVirtual(char key)
         {
@@ -282,52 +280,54 @@ namespace Game
             if (key >= 'A' && key <= 'Z') return key;
             switch (key)
             {
-                case '\r':return 0x0D;
-                case ' ':return 0x20;
+                case '\r': return 0x0D;
+                case ' ': return 0x20;
                 default: throw new NotImplementedException($":(");
             }
         }
     }
 
-    // Sry de ez szerintem egyértelmű mit csinál, nem commentelem
+    /// <summary>
+    /// Simple handler for manipulating the console buffer
+    /// </summary>
     public struct Drawer
     {
-        readonly Win32.CharInfo[] buffer;
+        readonly Win32.ConsoleCharacter[] Buffer;
 
         public readonly int Width;
         public readonly short Height;
 
-        public Win32.CharInfo this[int x, int y]
+        public Win32.ConsoleCharacter this[int x, int y]
         {
             get
             {
-                if (x < 0 || y < 0) return Win32.CharInfo.Zero;
-                if (x >= Width || y >= Height) return Win32.CharInfo.Zero;
-                return buffer[x + (y * Width)];
+                if (x < 0 || y < 0) return Win32.ConsoleCharacter.Zero;
+                if (x >= Width || y >= Height) return Win32.ConsoleCharacter.Zero;
+                return Buffer[x + (y * Width)];
             }
             set
             {
                 if (x < 0 || y < 0) return;
                 if (x >= Width || y >= Height) return;
-                buffer[x + (y * Width)] = value;
+                Buffer[x + (y * Width)] = value;
             }
         }
 
-        public Win32.CharInfo this[double x, double y]
+        public Win32.ConsoleCharacter this[double x, double y]
         {
             get => this[(int)Math.Round(x), (int)Math.Round(y)];
             set => this[(int)Math.Round(x), (int)Math.Round(y)] = value;
         }
 
-        public Win32.CharInfo this[Vector2 point]
+        public Win32.ConsoleCharacter this[Vector2 point]
         {
             get => this[point.X, point.Y];
             set => this[point.X, point.Y] = value;
         }
 
-        public Drawer(Win32.CharInfo[] buffer, int width, short height)
+        public Drawer(Win32.ConsoleCharacter[] buffer, int width, short height)
         {
-            this.buffer = buffer;
+            Buffer = buffer;
             Width = width;
             Height = height;
         }
@@ -335,124 +335,113 @@ namespace Game
         public void DrawText(int x, int y, string text, Color foregroundColor = Color.Silver, Color backgroundColor = Color.Black)
         {
             for (int i = 0; i < text.Length; i++)
-            { this[x + i, y] = new Win32.CharInfo(text[i], foregroundColor, backgroundColor); }
+            { this[x + i, y] = new Win32.ConsoleCharacter(text[i], foregroundColor, backgroundColor); }
         }
 
-        internal void Clear() => Array.Clear(buffer, 0, buffer.Length);
+        public void Clear() => Array.Clear(Buffer, 0, Buffer.Length);
     }
 
+    /// <summary>
+    /// Helper class for handling mouse input
+    /// </summary>
     public class Mouse
     {
+        /// <summary>
+        /// The mouse position in console rows and columns
+        /// </summary>
         public static Vector2 Position { get; private set; }
-        public static bool IsLeftDown { get; private set; }
 
-        // Ez lefut ha az egérrel történik valami
-        public static void HandleMouseEvent(Win32.MOUSE_EVENT_RECORD e)
+        /// <summary>
+        /// Is the left mouse button down?
+        /// </summary>
+        public static bool IsLeftDown { get; private set; }
+        /// <summary>
+        /// Is the right mouse button down?
+        /// </summary>
+        public static bool IsRightDown { get; private set; }
+
+        public static void HandleMouseEvent(Win32.MouseEvent e)
         {
-            // Lementjük az egér pozícióját (a konzolhoz relatívan, avagy "console space"-en)
-            Position = new Vector2(e.dwMousePosition.X, e.dwMousePosition.Y);
-            // A "dwButtonState" minden bit-je egy igaz-hamis érték.
-            // Ezzel akár 32 igaz-hamis értéket is eltárolhatunk egy int-ben.
-            // Tehát ennek a legutolsó bit-jét szedjük ki, ami a bal klikk helyzete (1 = lenyomva, 0 = nem lenyomva)
-            IsLeftDown = (e.dwButtonState & 1) != 0;
+            Position = new Vector2(e.MousePosition.X, e.MousePosition.Y);
+            IsLeftDown = (e.ButtonState & 1) != 0;  // 0b_0001
+            IsRightDown = (e.ButtonState & 2) != 0; // 0b_0010
         }
     }
 
     /// <summary>
-    /// A játékod interfésze
+    /// The interface of your game
     /// </summary>
     public interface IGame
     {
         /// <summary>
-        /// Ez egyszer fog lefutni az első "Update" előtt
+        /// This will run once before the first <see cref="Update(Drawer)"/>.
         /// </summary>
         void Initialize();
 
         /// <summary>
-        /// Ez automatikusan meg lesz hívva egy while loop-ban
+        /// This will automatically called within a while loop
         /// </summary>
         /// <param name="drawer">
-        /// Rajzoló kezelő cucc
+        /// An instance of a console buffer manipulating handler
         /// </param>
         void Update(Drawer drawer);
     }
 
-    /// <summary>
-    /// A fő game engine cucc, ez kezeli a mindent is amit neked nem kell
-    /// </summary>
     public class Engine
     {
         static Engine Instance;
 
-        /// <summary>
-        /// Ki kéne lépni a játékból?
-        /// </summary>
         bool ShouldExit;
+        readonly SafeFileHandle Handle;
 
         /// <summary>
-        /// A játékod példánya
-        /// <br/>
-        /// Az <see cref="Engine"/>-t nem érdekli hogy működik, a lényeg, hogy legyen benne
-        /// egy Update és egy Initialize function
+        /// The instance of your game
         /// </summary>
         readonly IGame Game;
 
         /// <summary>
-        /// Standard output handle
-        /// <br/>
-        /// A standard output az egy úgymond adat stream,
-        /// amit szöveges kimenetként szoktunk használni.
-        /// Pl a Console.WriteLine ebbe a stream-ba ír.
-        /// <br/>
-        /// A handle egy windows cucc, kissé hosszú lenne elmagyarázni.
+        /// <para>
+        /// The console buffer
+        /// </para>
+        /// <para>
+        /// Think of it as a 2d array, but the windows API function can't accept a 2d array,
+        /// but this is it, believe me.
+        /// </para>
         /// </summary>
-        readonly SafeFileHandle Handle;
+        Win32.ConsoleCharacter[] Buffer;
 
         /// <summary>
-        /// A konzol buffer
-        /// <br/>
-        /// Ezt egy 2d-s tömbnek képzeld el, de a windows API function nem
-        /// tud 2d-s tömböt elfogadni, de ez az hidd el nekem.
-        /// <br/>
-        /// Minden elem a tömbben egy karakter a konzolon.
-        /// Ezért ha a konzolt átméretezed, kezelni kell ennek a tömbnek a méretét is.
-        /// </summary>
-        Win32.CharInfo[] Buffer;
-        /// <summary>
-        /// A buffer mérete
+        /// The size of <see cref="Buffer"/>
         /// </summary>
         Win32.SmallRect Rect;
 
-        /// <summary>
-        /// Az előző game frame ideje (kell a delta time számításához)
-        /// </summary>
         double lastTime;
-        /// <summary>
-        /// Az eltárolt delta time, hogy ne kelljen folyton kiszámítani amikor kell nekünk.
-        /// </summary>
         float deltaTime;
 
         /// <summary>
-        /// Az eltelt idő az előző frissítés óta másodpercekben mérve
+        /// The elapsed time since the last update measured in seconds
         /// </summary>
         public static float DeltaTime => Instance.deltaTime;
 
         /// <summary>
-        /// A mostani idő másodpercekben mérve
+        /// The current time measured in seconds
         /// </summary>
+        /// <remarks>
+        /// More accurately, this is how many seconds passed since midnight.
+        /// </remarks>
         public static float Now => (float)Instance.lastTime;
 
         /// <summary>
-        /// Frame per seconds
+        /// Frame / seconds
         /// </summary>
         public static float FPS => 1f / Instance.deltaTime;
 
         /// <summary>
-        /// A konzol szélessége karakterekben mérve (oszlopok száma)
+        /// Console width in characters (number of columns)
         /// </summary>
         public static short Width => (short)Console.WindowWidth;
         /// <summary>
-        /// A konzol magassága karakterekben mérve (sorok száma)
+        /// Console height measured in characters (number of lines)
         /// </summary>
         public static short Height => (short)Console.WindowHeight;
 
@@ -462,7 +451,7 @@ namespace Game
 
             Game = game;
 
-            Buffer = new Win32.CharInfo[Width * Height];
+            Buffer = new Win32.ConsoleCharacter[Width * Height];
 
             // Lekérjük a standard output handle-jét.
             // Úgy néz ki mint ha egy fájlal csinálnánk valamit. Ez igazából igaz, de a fájl
@@ -481,11 +470,16 @@ namespace Game
         }
 
         /// <summary>
-        /// Ezt hívd meg hogy elindítsd a játékod
+        /// Call this to start your game
         /// </summary>
         /// <param name="game">
-        /// Ide a játékod példányát adj meg, amit majd ez automatikusan lefuttat
+        /// The instance of your game
         /// </param>
+        /// <remarks>
+        /// To get started, create a class that implements the
+        /// interface <see cref="IGame"/>. Then create an instance of it, and
+        /// pass that into this function.
+        /// </remarks>
         public static void DoTheStuff(IGame game) => new Engine(game).OnStart();
 
         void OnStart()
@@ -503,11 +497,10 @@ namespace Game
             // beállítjuk a konzol módot
             Win32.Kernel32.SetConsoleMode(inHandle, mode);
 
-            // Elindítjuk a ConsoleListener-t
-            Win32.ConsoleListener.Start();
             // Hallgatunk egy egér event-re
             // Ha valami történik az egérrel, a "Mouse.HandleMouseEvent" fog lefutni
-            Win32.ConsoleListener.MouseEvent += Mouse.HandleMouseEvent;
+            Win32.ConsoleListener.OnMouseEvent += Mouse.HandleMouseEvent;
+            Win32.ConsoleListener.Start();
 
             // Meghívjuk a te function-odat, ami initializálja a játékod
             Game.Initialize();
@@ -524,7 +517,7 @@ namespace Game
                 if (Rect.Right != Width || Rect.Bottom != Height)
                 {
                     // Frissítjük a buffer-t (ezzel kitörlünk mindent amit eddig "rajzoltunk" a buffer-be)
-                    Buffer = new Win32.CharInfo[Width * Height];
+                    Buffer = new Win32.ConsoleCharacter[Width * Height];
                     // és elmentjük az új méretet (2 sor)
                     Rect.Right = Width;
                     Rect.Bottom = Height;
@@ -542,8 +535,8 @@ namespace Game
 
                 // Meghívunk egy Win32 API-t, ami a buffert tényleg átmásolja a konzolba
                 _ = Win32.Kernel32.WriteConsoleOutputW(Handle, Buffer,
-                        new Win32.Coord() { X = Width, Y = Height },
-                        new Win32.Coord() { X = 0, Y = 0 },
+                        new Win32.ConsolePoint() { X = Width, Y = Height },
+                        new Win32.ConsolePoint() { X = 0, Y = 0 },
                         ref Rect);
 
                 if (ShouldExit)
@@ -553,14 +546,15 @@ namespace Game
             // Ide akkor jövünk ha bezártuk a konzolt
 
             // Befejezzük a hallgatást az egérre
-            Win32.ConsoleListener.MouseEvent -= Mouse.HandleMouseEvent;
+            Win32.ConsoleListener.OnMouseEvent -= Mouse.HandleMouseEvent;
             // Leállítjuk a "ConsoleListener"-t
             Win32.ConsoleListener.Stop();
         }
 
         /// <summary>
-        /// Kilép a while loop-ból ami lefuttatja a te "Update" function-odat. Vagyis kilép a játékból.
-        /// Lehet hogy nem működik, nincs kedvem kijavítani a hibát.
+        /// It exits the while loop, which calls your <see cref="IGame.Update(Drawer)"/> function.
+        /// That is, it exits the game.
+        /// Maybe it doesn't work, I don't feel like fixing it.
         /// </summary>
         public static void Exit() => Instance.ShouldExit = true;
     }

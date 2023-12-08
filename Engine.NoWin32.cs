@@ -9,14 +9,14 @@ namespace Game
     namespace Win32
     {
         [StructLayout(LayoutKind.Explicit, CharSet = CharSet.Unicode)]
-        public struct CharInfo
+        public struct ConsoleCharacter
         {
             [FieldOffset(0)] public char Char;
             [FieldOffset(2)] public ushort Attributes;
 
-            public static CharInfo Zero => new CharInfo('\0', (byte)0, (byte)0);
+            public static ConsoleCharacter Zero => new ConsoleCharacter('\0', (byte)0, (byte)0);
 
-            public CharInfo(char @char, byte foregroundColor, byte backgroundColor)
+            public ConsoleCharacter(char @char, byte foregroundColor, byte backgroundColor)
             {
                 Char = @char;
 
@@ -26,11 +26,11 @@ namespace Game
                 Attributes = (ushort)((backgroundColor << 4) | foregroundColor);
             }
 
-            public CharInfo(char @char, Color foregroundColor, Color backgroundColor) : this(@char, (byte)foregroundColor, (byte)backgroundColor)
+            public ConsoleCharacter(char @char, Color foregroundColor, Color backgroundColor) : this(@char, (byte)foregroundColor, (byte)backgroundColor)
             { }
 
-            public static implicit operator char(CharInfo v) => v.Char;
-            public static implicit operator CharInfo(char v) => new CharInfo(v, 0x7, 0x0);
+            public static implicit operator char(ConsoleCharacter v) => v.Char;
+            public static implicit operator ConsoleCharacter(char v) => new ConsoleCharacter(v, Color.Silver, Color.Black);
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -44,10 +44,10 @@ namespace Game
     }
 
     /// <summary>
-    /// Egy konzol szín. A konzolban nem használhatunk (vagyis de de mind1)
-    /// RGB színt, mert a Win32 API nem support-álja.
-    /// Ez is egy bitmask cucc, amit így kell értelmezni:<br/>
-    /// <c>IRGB</c>
+    /// Console color
+    /// </summary>
+    /// <remarks>
+    /// Represents console color in 4-bit format as follows: <c>IRGB</c>
     /// <br/>
     /// <c>I</c> - Intensity
     /// <br/>
@@ -56,7 +56,7 @@ namespace Game
     /// <c>G</c> - Green
     /// <br/>
     /// <c>B</c> - Blue
-    /// </summary>
+    /// </remarks>
     public enum Color : byte
     {
         Red = 0x4,
@@ -83,6 +83,12 @@ namespace Game
     {
         static readonly bool[] Buffer = new bool[byte.MaxValue];
 
+        /// <summary>
+        /// Checks whether the key associated with <paramref name="character"/> is down or not.
+        /// </summary>
+        /// <returns>
+        /// <see langword="true"/> if the key is pressed, <see langword="false"/> otherwise.
+        /// </returns>
         /// <exception cref="NotImplementedException"/>
         public static bool IsKeyPressed(char key)
         {
@@ -91,6 +97,12 @@ namespace Game
             return Buffer[key];
         }
 
+        /// <summary>
+        /// Checks whether the specified key is down or not.
+        /// </summary>
+        /// <returns>
+        /// <see langword="true"/> if the key is pressed, <see langword="false"/> otherwise.
+        /// </returns>
         /// <exception cref="NotImplementedException"/>
         public static bool IsKeyPressed(int key)
         {
@@ -118,20 +130,22 @@ namespace Game
         }
     }
 
-    // Sry de ez szerintem egyértelmű mit csinál, nem commentelem
+    /// <summary>
+    /// Simple handler for manipulating the console buffer
+    /// </summary>
     public struct Drawer
     {
-        readonly Win32.CharInfo[] buffer;
+        readonly Win32.ConsoleCharacter[] buffer;
 
         public readonly int Width;
         public readonly short Height;
 
-        public Win32.CharInfo this[int x, int y]
+        public Win32.ConsoleCharacter this[int x, int y]
         {
             get
             {
-                if (x < 0 || y < 0) return Win32.CharInfo.Zero;
-                if (x >= Width || y >= Height) return Win32.CharInfo.Zero;
+                if (x < 0 || y < 0) return Win32.ConsoleCharacter.Zero;
+                if (x >= Width || y >= Height) return Win32.ConsoleCharacter.Zero;
                 return buffer[x + (y * Width)];
             }
             set
@@ -148,19 +162,19 @@ namespace Game
             }
         }
 
-        public Win32.CharInfo this[double x, double y]
+        public Win32.ConsoleCharacter this[double x, double y]
         {
             get => this[(int)Math.Round(x), (int)Math.Round(y)];
             set => this[(int)Math.Round(x), (int)Math.Round(y)] = value;
         }
 
-        public Win32.CharInfo this[Vector2 point]
+        public Win32.ConsoleCharacter this[Vector2 point]
         {
             get => this[point.X, point.Y];
             set => this[point.X, point.Y] = value;
         }
 
-        public Drawer(Win32.CharInfo[] buffer, int width, short height)
+        public Drawer(Win32.ConsoleCharacter[] buffer, int width, short height)
         {
             this.buffer = buffer;
             Width = width;
@@ -170,7 +184,7 @@ namespace Game
         public void DrawText(int x, int y, string text, Color foregroundColor = Color.Silver, Color backgroundColor = Color.Black)
         {
             for (int i = 0; i < text.Length; i++)
-            { this[x + i, y] = new Win32.CharInfo(text[i], foregroundColor, backgroundColor); }
+            { this[x + i, y] = new Win32.ConsoleCharacter(text[i], foregroundColor, backgroundColor); }
         }
 
         internal void Clear()
@@ -180,109 +194,79 @@ namespace Game
         }
     }
 
-    public class Mouse
-    {
-        public static Vector2 Position { get; private set; }
-        public static bool IsLeftDown { get; private set; }
-
-#if WIN32
-        // Ez lefut ha az egérrel történik valami
-        public static void HandleMouseEvent(Win32.MOUSE_EVENT_RECORD e)
-        {
-            // Lementjük az egér pozícióját (a konzolhoz relatívan, avagy "console space"-en)
-            Position = new Vector2(e.dwMousePosition.X, e.dwMousePosition.Y);
-            // A "dwButtonState" minden bit-je egy igaz-hamis érték.
-            // Ezzel akár 32 igaz-hamis értéket is eltárolhatunk egy int-ben.
-            // Tehát ennek a legutolsó bit-jét szedjük ki, ami a bal klikk helyzete (1 = lenyomva, 0 = nem lenyomva)
-            IsLeftDown = (e.dwButtonState & 0b_1) != 0;
-        }
-#endif
-    }
-
     /// <summary>
-    /// A játékod interfésze
+    /// The interface of your game
     /// </summary>
     public interface IGame
     {
         /// <summary>
-        /// Ez egyszer fog lefutni az első "Update" előtt
+        /// This will run once before the first <see cref="Update(Drawer)"/>.
         /// </summary>
         void Initialize();
 
         /// <summary>
-        /// Ez automatikusan meg lesz hívva egy while loop-ban
+        /// This will automatically called within a while loop
         /// </summary>
         /// <param name="drawer">
-        /// Rajzoló kezelő cucc
+        /// An instance of a console buffer manipulating handler
         /// </param>
         void Update(Drawer drawer);
     }
 
-    /// <summary>
-    /// A fő game engine cucc, ez kezeli a mindent is amit neked nem kell
-    /// </summary>
     public class Engine
     {
         static Engine Instance;
 
-        /// <summary>
-        /// Ki kéne lépni a játékból?
-        /// </summary>
         bool ShouldExit;
 
         /// <summary>
-        /// A játékod példánya
-        /// <br/>
-        /// Az <see cref="Engine"/>-t nem érdekli hogy működik, a lényeg, hogy legyen benne
-        /// egy Update és egy Initialize function
+        /// The instance of your game
         /// </summary>
         readonly IGame Game;
 
         /// <summary>
-        /// A konzol buffer
-        /// <br/>
-        /// Ezt egy 2d-s tömbnek képzeld el, de a windows API function nem
-        /// tud 2d-s tömböt elfogadni, de ez az hidd el nekem.
-        /// <br/>
-        /// Minden elem a tömbben egy karakter a konzolon.
-        /// Ezért ha a konzolt átméretezed, kezelni kell ennek a tömbnek a méretét is.
+        /// <para>
+        /// The console buffer
+        /// </para>
+        /// <para>
+        /// Think of it as a 2d array, but the windows API function can't accept a 2d array,
+        /// but this is it, believe me.
+        /// </para>
         /// </summary>
-        Win32.CharInfo[] Buffer;
+        Win32.ConsoleCharacter[] Buffer;
+
         /// <summary>
-        /// A buffer mérete
+        /// The size of <see cref="Buffer"/>
         /// </summary>
         Win32.SmallRect Rect;
 
-        /// <summary>
-        /// Az előző game frame ideje (kell a delta time számításához)
-        /// </summary>
         double lastTime;
-        /// <summary>
-        /// Az eltárolt delta time, hogy ne kelljen folyton kiszámítani amikor kell nekünk.
-        /// </summary>
         float deltaTime;
 
         /// <summary>
-        /// Az eltelt idő az előző frissítés óta másodpercekben mérve
+        /// The elapsed time since the last update measured in seconds
         /// </summary>
         public static float DeltaTime => Instance.deltaTime;
 
         /// <summary>
-        /// A mostani idő másodpercekben mérve
+        /// The current time measured in seconds
         /// </summary>
+        /// <remarks>
+        /// More accurately, this is how many seconds passed since midnight.
+        /// </remarks>
         public static float Now => (float)Instance.lastTime;
 
         /// <summary>
-        /// Frame per seconds
+        /// Frame / seconds
         /// </summary>
         public static float FPS => 1f / Instance.deltaTime;
 
         /// <summary>
-        /// A konzol szélessége karakterekben mérve (oszlopok száma)
+        /// Console width in characters (number of columns)
         /// </summary>
         public static short Width => (short)Console.WindowWidth;
         /// <summary>
-        /// A konzol magassága karakterekben mérve (sorok száma)
+        /// Console height measured in characters (number of lines)
         /// </summary>
         public static short Height => (short)Console.WindowHeight;
 
@@ -292,7 +276,7 @@ namespace Game
 
             Game = game;
 
-            Buffer = new Win32.CharInfo[Width * Height];
+            Buffer = new Win32.ConsoleCharacter[Width * Height];
 
             Rect = new Win32.SmallRect()
             {
@@ -306,11 +290,16 @@ namespace Game
         }
 
         /// <summary>
-        /// Ezt hívd meg hogy elindítsd a játékod
+        /// Call this to start your game
         /// </summary>
         /// <param name="game">
-        /// Ide a játékod példányát adj meg, amit majd ez automatikusan lefuttat
+        /// The instance of your game
         /// </param>
+        /// <remarks>
+        /// To get started, create a class that implements the
+        /// interface <see cref="IGame"/>. Then create an instance of it, and
+        /// pass that into this function.
+        /// </remarks>
         public static void DoTheStuff(IGame game) => new Engine(game).OnStart();
 
         void OnStart()
@@ -330,34 +319,25 @@ namespace Game
 
             float shouldClearKeyboard = 0f;
 
-            // Meghívjuk a te function-odat, ami initializálja a játékod
             Game.Initialize();
 
             while (true)
             {
-                // Kiszámítjuk a delta time-t (ez a 3 sor)
                 double now = DateTime.UtcNow.TimeOfDay.TotalSeconds;
                 deltaTime = (float)(now - lastTime);
                 lastTime = now;
 
-                // Ha az elmentett konzol mérete nem egyezik meg a ténylegessel, ...
                 if (Rect.Right != Width || Rect.Bottom != Height)
                 {
-                    // Frissítjük a buffer-t (ezzel kitörlünk mindent amit eddig "rajzoltunk" a buffer-be)
-                    Buffer = new Win32.CharInfo[Width * Height];
-                    // és elmentjük az új méretet (2 sor)
+                    Buffer = new Win32.ConsoleCharacter[Width * Height];
                     Rect.Right = Width;
                     Rect.Bottom = Height;
                 }
                 else
                 {
-                    // Kitöröljük a buffer-t
                     Array.Clear(Buffer, 0, Buffer.Length);
                 }
 
-                // Most itt a buffer mérete rendben van, és üres karakterekkel van feltöltve
-
-                // Meghívjuk a te function-odat, ami kezeli majd a játék dolgokat
                 Game.Update(new Drawer(Buffer, Width, Height));
 
                 shouldClearKeyboard += deltaTime;
@@ -377,14 +357,13 @@ namespace Game
                 { break; }
             }
 
-            // Ide akkor jövünk ha bezártuk a konzolt
-
             Console.CursorVisible = true;
         }
 
         /// <summary>
-        /// Kilép a while loop-ból ami lefuttatja a te "Update" function-odat. Vagyis kilép a játékból.
-        /// Lehet hogy nem működik, nincs kedvem kijavítani a hibát.
+        /// It exits the while loop, which calls your <see cref="IGame.Update(Drawer)"/> function.
+        /// That is, it exits the game.
+        /// Maybe it doesn't work, I don't feel like fixing it.
         /// </summary>
         public static void Exit() => Instance.ShouldExit = true;
     }
