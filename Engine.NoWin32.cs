@@ -1,13 +1,26 @@
 ﻿#if IS_LINUX
 using System;
-using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Threading;
+using Game.Win32;
 
 namespace Game
 {
     namespace Win32
     {
+        [StructLayout(LayoutKind.Sequential)]
+        public struct ConsolePoint
+        {
+            public short X;
+            public short Y;
+
+            public ConsolePoint(short X, short Y)
+            {
+                this.X = X;
+                this.Y = Y;
+            }
+        }
+
         [StructLayout(LayoutKind.Explicit, CharSet = CharSet.Unicode)]
         public struct ConsoleCharacter
         {
@@ -133,19 +146,19 @@ namespace Game
     /// <summary>
     /// Simple handler for manipulating the console buffer
     /// </summary>
-    public struct Drawer
+    public readonly struct Drawer
     {
-        readonly Win32.ConsoleCharacter[] buffer;
+        readonly ConsoleCharacter[] buffer;
 
         public readonly int Width;
         public readonly short Height;
 
-        public Win32.ConsoleCharacter this[int x, int y]
+        public ConsoleCharacter this[int x, int y]
         {
             get
             {
-                if (x < 0 || y < 0) return Win32.ConsoleCharacter.Zero;
-                if (x >= Width || y >= Height) return Win32.ConsoleCharacter.Zero;
+                if (x < 0 || y < 0) return ConsoleCharacter.Zero;
+                if (x >= Width || y >= Height) return ConsoleCharacter.Zero;
                 return buffer[x + (y * Width)];
             }
             set
@@ -162,19 +175,19 @@ namespace Game
             }
         }
 
-        public Win32.ConsoleCharacter this[double x, double y]
+        public ConsoleCharacter this[double x, double y]
         {
             get => this[(int)Math.Round(x), (int)Math.Round(y)];
             set => this[(int)Math.Round(x), (int)Math.Round(y)] = value;
         }
 
-        public Win32.ConsoleCharacter this[Vector2 point]
+        public ConsoleCharacter this[ConsolePoint point]
         {
             get => this[point.X, point.Y];
             set => this[point.X, point.Y] = value;
         }
 
-        public Drawer(Win32.ConsoleCharacter[] buffer, int width, short height)
+        public Drawer(ConsoleCharacter[] buffer, int width, short height)
         {
             this.buffer = buffer;
             Width = width;
@@ -184,7 +197,7 @@ namespace Game
         public void DrawText(int x, int y, string text, Color foregroundColor = Color.Silver, Color backgroundColor = Color.Black)
         {
             for (int i = 0; i < text.Length; i++)
-            { this[x + i, y] = new Win32.ConsoleCharacter(text[i], foregroundColor, backgroundColor); }
+            { this[x + i, y] = new ConsoleCharacter(text[i], foregroundColor, backgroundColor); }
         }
 
         internal void Clear()
@@ -233,12 +246,12 @@ namespace Game
         /// but this is it, believe me.
         /// </para>
         /// </summary>
-        Win32.ConsoleCharacter[] Buffer;
+        ConsoleCharacter[] Buffer;
 
         /// <summary>
         /// The size of <see cref="Buffer"/>
         /// </summary>
-        Win32.SmallRect Rect;
+        SmallRect Rect;
 
         double lastTime;
         float deltaTime;
@@ -276,9 +289,9 @@ namespace Game
 
             Game = game;
 
-            Buffer = new Win32.ConsoleCharacter[Width * Height];
+            Buffer = new ConsoleCharacter[Width * Height];
 
-            Rect = new Win32.SmallRect()
+            Rect = new SmallRect()
             {
                 Left = 0,
                 Top = 0,
@@ -329,7 +342,7 @@ namespace Game
 
                 if (Rect.Right != Width || Rect.Bottom != Height)
                 {
-                    Buffer = new Win32.ConsoleCharacter[Width * Height];
+                    Buffer = new ConsoleCharacter[Width * Height];
                     Rect.Right = Width;
                     Rect.Bottom = Height;
                 }

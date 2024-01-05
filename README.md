@@ -1,22 +1,13 @@
-# Programozás feladatok
+# Single-File Console Renderer
 
-![C# 7.0](https://img.shields.io/badge/c%23-7.0-%23239120.svg)
-![.NET 5.0](https://img.shields.io/badge/.NET-5.0-5C2D91)
+![.NET Framework 2.0](https://img.shields.io/badge/.NET_Framework-2.0-5C2D91)
 
-## 1. Feladat
-Ebben a feladatban egy 2D-s játékot kell csinálnod.
+## Usage
 
-Feladatleírás: https://github.com/BBpezsgo/Feladatozas/blob/main/feladat1.txt
+Copy the `Engine.cs` file into your project and you're ready to go.
 
-Példa: https://github.com/BBpezsgo/Feladatozas/blob/main/Example1.cs
+Look at `Program.cs` for a small example.
 
-## 2. Feladat
-Ebben a feladatban pedig geometriai alakzatoknak kell class-okat csinálnod.
 
-Feladatleírás: https://github.com/BBpezsgo/Feladatozas/blob/main/feladat2.txt
-
-Példa: https://github.com/BBpezsgo/Feladatozas/blob/main/Example2.cs
-
-# SOK SIKERT
-
-Ha help kéne akkor tudod hogy nézek ki, megtalálsz.
+> [!NOTE]
+> It uses the Win32 API. If you want it to work on Linux, use `Engine.NoWin32.cs` instead.

@@ -1,4 +1,8 @@
 /bin
 /obj
 /.vs
-/Feladatozas.sln
+
+/Old
+
+*.sln
+*.user
