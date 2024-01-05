@@ -1,6 +1,6 @@
 # Single-File Console Renderer
 
-![.NET Framework 2.0](https://img.shields.io/badge/.NET_Framework-2.0-5C2D91)
+[![.NET Framework 2.0](https://img.shields.io/badge/.NET_Framework-2.0-5C2D91)](#)
 
 ## Usage
 
