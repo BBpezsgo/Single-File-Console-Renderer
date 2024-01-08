@@ -256,7 +256,6 @@ namespace Game
         /// <remarks>
         /// For the list of key codes, see <see href="https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes"/>
         /// </remarks>
-        /// <exception cref="NotImplementedException"/>
         public static bool IsKeyPressed(int virtualScanCode)
         {
             short state = Win32.Kernel32.GetKeyState(virtualScanCode);
@@ -279,7 +278,8 @@ namespace Game
             {
                 case '\r': return 0x0D;
                 case ' ': return 0x20;
-                default: throw new NotImplementedException($":(");
+                case '\t': return 0x09;
+                default: throw new NotImplementedException($"Char-to-VirtualKeyCode conversion for this specific character (\'{key}\') isn't implemented. Please use a virtual key code instead. Thank you!");
             }
         }
     }
@@ -291,7 +291,13 @@ namespace Game
     {
         readonly ConsoleCharacter[] Buffer;
 
+        /// <summary>
+        /// The width of the console buffer in characters (number of columns)
+        /// </summary>
         public readonly int Width;
+        /// <summary>
+        /// The height of the console buffer in characters (number of rows)
+        /// </summary>
         public readonly short Height;
 
         public ConsoleCharacter this[int x, int y]
@@ -329,12 +335,24 @@ namespace Game
             Height = height;
         }
 
+        /// <summary>
+        /// Draws the specified <paramref name="text"/> at position <paramref name="x"/> and <paramref name="y"/>
+        /// </summary>
+        /// <remarks>
+        /// <b>Note:</b> This will not draws the text to the console, just puts it into the buffer
+        /// </remarks>
         public void DrawText(int x, int y, string text, Color foregroundColor = Color.Silver, Color backgroundColor = Color.Black)
         {
             for (int i = 0; i < text.Length; i++)
             { this[x + i, y] = new ConsoleCharacter(text[i], foregroundColor, backgroundColor); }
         }
 
+        /// <summary>
+        /// Clears the console buffer
+        /// </summary>
+        /// <remarks>
+        /// <b>Note:</b> This will not clears the console, just clears the buffer
+        /// </remarks>
         public void Clear() => Array.Clear(Buffer, 0, Buffer.Length);
     }
 
@@ -344,7 +362,7 @@ namespace Game
     public class Mouse
     {
         /// <summary>
-        /// The mouse position in console rows and columns
+        /// The mouse position on the console
         /// </summary>
         public static ConsolePoint Position { get; private set; }
 
@@ -379,7 +397,7 @@ namespace Game
         /// This will automatically called within a while loop
         /// </summary>
         /// <param name="drawer">
-        /// An instance of a console buffer manipulating handler
+        /// Use this to draw onto the console
         /// </param>
         void Update(Drawer drawer);
     }
@@ -429,16 +447,16 @@ namespace Game
         public static float Now => (float)Instance.lastTime;
 
         /// <summary>
-        /// Frame / seconds
+        /// Frames / second
         /// </summary>
         public static float FPS => 1f / Instance.deltaTime;
 
         /// <summary>
-        /// Console width in characters (number of columns)
+        /// Width of the console in characters (number of columns)
         /// </summary>
         public static short Width => (short)Console.WindowWidth;
         /// <summary>
-        /// Console height measured in characters (number of lines)
+        /// Height of the console measured in characters (number of rows)
         /// </summary>
         public static short Height => (short)Console.WindowHeight;
 

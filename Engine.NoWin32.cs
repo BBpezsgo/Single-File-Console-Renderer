@@ -29,7 +29,10 @@ namespace Game
 
             public static ConsoleCharacter Zero => new ConsoleCharacter('\0', (byte)0, (byte)0);
 
-            public ConsoleCharacter(char @char, byte foregroundColor, byte backgroundColor)
+            public ConsoleCharacter(char @char, Color foregroundColor = Color.Silver, Color backgroundColor = Color.Black) : this(@char, (byte)foregroundColor, (byte)backgroundColor)
+            { }
+
+            ConsoleCharacter(char @char, byte foregroundColor, byte backgroundColor)
             {
                 Char = @char;
 
@@ -38,9 +41,6 @@ namespace Game
 
                 Attributes = (ushort)((backgroundColor << 4) | foregroundColor);
             }
-
-            public ConsoleCharacter(char @char, Color foregroundColor, Color backgroundColor) : this(@char, (byte)foregroundColor, (byte)backgroundColor)
-            { }
 
             public static implicit operator char(ConsoleCharacter v) => v.Char;
             public static implicit operator ConsoleCharacter(char v) => new ConsoleCharacter(v, Color.Silver, Color.Black);
@@ -92,6 +92,9 @@ namespace Game
         White = 0xf,
     }
 
+    /// <summary>
+    /// Helper class for handling keyboard input
+    /// </summary>
     public static class Keyboard
     {
         static readonly bool[] Buffer = new bool[byte.MaxValue];
@@ -116,7 +119,6 @@ namespace Game
         /// <returns>
         /// <see langword="true"/> if the key is pressed, <see langword="false"/> otherwise.
         /// </returns>
-        /// <exception cref="NotImplementedException"/>
         public static bool IsKeyPressed(int key)
         {
             if (key < byte.MinValue || key >= byte.MaxValue) return false;
@@ -148,9 +150,15 @@ namespace Game
     /// </summary>
     public readonly struct Drawer
     {
-        readonly ConsoleCharacter[] buffer;
+        readonly ConsoleCharacter[] Buffer;
 
+        /// <summary>
+        /// The width of the console buffer in characters (number of columns)
+        /// </summary>
         public readonly int Width;
+        /// <summary>
+        /// The height of the console buffer in characters (number of rows)
+        /// </summary>
         public readonly short Height;
 
         public ConsoleCharacter this[int x, int y]
@@ -159,19 +167,13 @@ namespace Game
             {
                 if (x < 0 || y < 0) return ConsoleCharacter.Zero;
                 if (x >= Width || y >= Height) return ConsoleCharacter.Zero;
-                return buffer[x + (y * Width)];
+                return Buffer[x + (y * Width)];
             }
             set
             {
                 if (x < 0 || y < 0) return;
                 if (x >= Width || y >= Height) return;
-                buffer[x + (y * Width)] = value;
-#if false
-                Console.Out.Write($"\x1b[{y + 1};{x + 1}H");
-                Console.Out.Write($"\x1b[38;5;{value.Attributes & 0b_1111}m");
-                Console.Out.Write($"\x1b[48;5;{(value.Attributes >> 4) & 0b_1111}m");
-                Console.Out.Write(value.Char);
-#endif
+                Buffer[x + (y * Width)] = value;
             }
         }
 
@@ -189,22 +191,30 @@ namespace Game
 
         public Drawer(ConsoleCharacter[] buffer, int width, short height)
         {
-            this.buffer = buffer;
+            Buffer = buffer;
             Width = width;
             Height = height;
         }
 
+        /// <summary>
+        /// Draws the specified <paramref name="text"/> at position <paramref name="x"/> and <paramref name="y"/>
+        /// </summary>
+        /// <remarks>
+        /// <b>Note:</b> This will not draws the text to the console, just puts it into the buffer
+        /// </remarks>
         public void DrawText(int x, int y, string text, Color foregroundColor = Color.Silver, Color backgroundColor = Color.Black)
         {
             for (int i = 0; i < text.Length; i++)
             { this[x + i, y] = new ConsoleCharacter(text[i], foregroundColor, backgroundColor); }
         }
 
-        internal void Clear()
-        {
-            Console.Clear();
-            Array.Clear(buffer, 0, buffer.Length);
-        }
+        /// <summary>
+        /// Clears the console buffer
+        /// </summary>
+        /// <remarks>
+        /// <b>Note:</b> This will not clears the console, just clears the buffer
+        /// </remarks>
+        public void Clear() => Array.Clear(Buffer, 0, Buffer.Length);
     }
 
     /// <summary>
@@ -221,7 +231,7 @@ namespace Game
         /// This will automatically called within a while loop
         /// </summary>
         /// <param name="drawer">
-        /// An instance of a console buffer manipulating handler
+        /// Use this to draw onto the console
         /// </param>
         void Update(Drawer drawer);
     }
@@ -251,7 +261,7 @@ namespace Game
         /// <summary>
         /// The size of <see cref="Buffer"/>
         /// </summary>
-        SmallRect Rect;
+        Win32.SmallRect Rect;
 
         double lastTime;
         float deltaTime;
@@ -270,16 +280,16 @@ namespace Game
         public static float Now => (float)Instance.lastTime;
 
         /// <summary>
-        /// Frame / seconds
+        /// Frames / second
         /// </summary>
         public static float FPS => 1f / Instance.deltaTime;
 
         /// <summary>
-        /// Console width in characters (number of columns)
+        /// Width of the console in characters (number of columns)
         /// </summary>
         public static short Width => (short)Console.WindowWidth;
         /// <summary>
-        /// Console height measured in characters (number of lines)
+        /// Height of the console measured in characters (number of rows)
         /// </summary>
         public static short Height => (short)Console.WindowHeight;
 
@@ -291,7 +301,7 @@ namespace Game
 
             Buffer = new ConsoleCharacter[Width * Height];
 
-            Rect = new SmallRect()
+            Rect = new Win32.SmallRect()
             {
                 Left = 0,
                 Top = 0,
