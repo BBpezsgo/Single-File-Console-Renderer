@@ -22,38 +22,38 @@ namespace Game
 
             public static void Start()
             {
-                if (!IsRunning)
-                {
-                    IsRunning = true;
+                if (IsRunning) return;
 
-                    ConsoleHandle inputHandle = Kernel32.GetStdHandle(Kernel32.STD_INPUT_HANDLE);
+                IsRunning = true;
 
-                    new Thread(() =>
-                    {
-                        while (IsRunning)
-                        {
-                            uint readRecords = 0;
-                            InputEvent record = new InputEvent();
-                            Kernel32.ReadConsoleInput(inputHandle, ref record, 1, ref readRecords);
-
-                            if (IsRunning)
-                            {
-                                switch (record.EventType)
-                                {
-                                    case Kernel32.MOUSE_EVENT:
-                                        OnMouseEvent?.Invoke(record.MouseEvent);
-                                        break;
-                                    case Kernel32.KEY_EVENT:
-                                        OnKeyEvent?.Invoke(record.KeyEvent);
-                                        break;
-                                }
-                            }
-                        }
-                    }).Start();
-                }
+                new Thread(ThreadJob).Start();
             }
 
             public static void Stop() => IsRunning = false;
+
+            static void ThreadJob()
+            {
+                ConsoleHandle inputHandle = Kernel32.GetStdHandle(Kernel32.STD_INPUT_HANDLE);
+
+                while (IsRunning)
+                {
+                    uint readRecords = default;
+                    InputEvent record = default;
+                    Kernel32.ReadConsoleInput(inputHandle, ref record, 1, ref readRecords);
+
+                    if (!IsRunning) break;
+
+                    switch (record.EventType)
+                    {
+                        case Kernel32.MOUSE_EVENT:
+                            OnMouseEvent?.Invoke(record.MouseEvent);
+                            break;
+                        case Kernel32.KEY_EVENT:
+                            OnKeyEvent?.Invoke(record.KeyEvent);
+                            break;
+                    }
+                }
+            }
         }
 
         [StructLayout(LayoutKind.Explicit)]
@@ -92,10 +92,10 @@ namespace Game
             public short X;
             public short Y;
 
-            public ConsolePoint(short X, short Y)
+            public ConsolePoint(short x, short y)
             {
-                this.X = X;
-                this.Y = Y;
+                this.X = x;
+                this.Y = y;
             }
         }
 
